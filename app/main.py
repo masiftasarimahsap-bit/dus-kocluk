@@ -20,9 +20,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = FastAPI(title="DUS Koçluk Sistemi")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+UPLOAD_DIR = os.path.join("/tmp", "uploads") if os.environ.get("VERCEL") else os.path.join(STATIC_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 DAYS_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 DAYS_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
