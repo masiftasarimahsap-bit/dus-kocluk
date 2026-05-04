@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Yeni Öğrenci — DUS Koçluk{% endblock %}
+{% block head %}
+<style>
+.kl-group { display:flex; gap:6px; margin-top:6px; }
+.kl-btn {
+  flex:1; padding:6px 4px; border:2px solid #e5e7eb; border-radius:8px;
+  font-size:12px; font-weight:600; cursor:pointer; text-align:center;
+  background:white; transition:all .15s;
+}
+.kl-btn:hover { border-color:#1e40af; }
+.kl-btn.active-0 { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+.kl-btn.active-1 { background:#fef9c3; border-color:#f59e0b; color:#92400e; }
+.kl-btn.active-2 { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+.kl-btn.active-3 { background:#dcfce7; border-color:#10b981; color:#065f46; }
+.topic-row { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+.topic-row:last-child { border-bottom:none; }
+.topic-info { flex:1; }
+.topic-name { font-size:13px; font-weight:500; color:#1e293b; }
+.topic-meta { font-size:11px; color:#9ca3af; margin-top:2px; }
+.topic-controls { min-width:220px; }
+.exam-prob { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<h1 style="font-size:22px; font-weight:700; margin-bottom:24px;">Yeni Öğrenci Kaydı</h1>
+
+<form method="post" action="/student/new" id="regForm">
+
+  <div class="card">
+    <h2>1️⃣ Kişisel Bilgiler</h2>
+    <div class="grid2">
+      <div class="form-group">
+        <label>Ad Soyad *</label>
+        <input type="text" name="name" required placeholder="Ahmet Yılmaz">
+      </div>
+      <div class="form-group">
+        <label>E-posta *</label>
+        <input type="email" name="email" required placeholder="ahmet@example.com">
+      </div>
+      <div class="form-group">
+        <label>Telefon</label>
+        <input type="text" name="phone" placeholder="0555 123 4567">
+      </div>
+      <div class="form-group">
+        <label>Hedef DUS Tarihi</label>
+        <input type="date" name="exam_date">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2️⃣ Çalışma Durumu</h2>
+    <div class="grid2">
+      <div class="form-group">
+        <label>Aktif olarak çalışıyor musunuz?</label>
+        <select name="is_working" onchange="toggleWork(this)">
+          <option value="no">Hayır</option>
+          <option value="yes">Evet</option>
+        </select>
+      </div>
+      <div class="form-group" id="work_hours_group" style="display:none;">
+        <label>Mesai Saatleri</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="time" name="work_start" style="width:auto;">
+          <span>—</span>
+          <input type="time" name="work_end" style="width:auto;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3️⃣ Haftalık Müsaitlik</h2>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      {% for i, day in [(0,'Pzt'), (1,'Sal'), (2,'Çar'), (3,'Per'), (4,'Cum'), (5,'Cmt'), (6,'Paz')] %}
+      {% set names = ['mon','tue','wed','thu','fri','sat','sun'] %}
+      <div style="flex:1; min-width:80px; text-align:center;">
+        <label style="font-size:13px;">{{ day }}</label>
+        <input type="number" name="{{ names[i] }}" min="0" max="16" step="0.5" value="0"
+               style="text-align:center; padding:8px 4px;" onchange="calcTotal()">
+      </div>
+      {% endfor %}
+    </div>
+    <p style="margin-top:12px; font-size:14px; color:#6b7280;">
+      Haftalık toplam: <strong id="total_hours">0</strong> saat → Profil: <strong id="profile_label">—</strong>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>4️⃣ Hedef</h2>
+    <div class="grid2">
+      <div class="form-group">
+        <label>Hedefiniz</label>
+        <select name="target_goal">
+          <option value="top100">İlk 100'e girmek</option>
+          <option value="top500" selected>İlk 500'e girmek</option>
+          <option value="pass">Sadece kazanmak</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Çalışma Tercihi</label>
+        <select name="study_pref">
+          <option value="morning">Sabah</option>
+          <option value="afternoon">Öğlen</option>
+          <option value="evening">Akşam</option>
+          <option value="flexible" selected>Esnek</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Daha önce DUS'a çalıştınız mı?</label>
+        <select name="previous_study">
+          <option value="no">Hayır</option>
+          <option value="yes">Evet</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Son Deneme Sınavı Puanı</label>
+        <input type="number" name="last_mock" min="0" max="100" placeholder="ör. 52">
+      </div>
+    </div>
+  </div>
+
+  <!-- Knowledge Assessment -->
+  <div class="card">
+    <h2>5️⃣ Konu Bazlı Bilgi Değerlendirmesi</h2>
+    <p style="font-size:13px; color:#6b7280; margin-bottom:20px;">
+      Her konu için mevcut bilgi seviyenizi işaretleyin. Program buna göre kişiselleştirilecek.
+      Kırmızı nokta = sınavda yüksek olasılıkla çıkan konu.
+    </p>
+
+    {% for course in courses %}
+    <div style="margin-bottom:24px;">
+      <div style="font-size:15px; font-weight:700; color:#1e40af; margin-bottom:12px; padding-bottom:6px; border-bottom:2px solid #dbeafe;">
+        {{ course.name }}
+        <span style="font-size:12px; font-weight:400; color:#9ca3af; margin-left:8px;">~{{ course.total_questions }} soru · %{{ course.weight_percent }}</span>
+      </div>
+      {% for topic in course.topics | sort(attribute='display_order') %}
+      <div class="topic-row">
+        <div class="topic-info">
+          <div class="topic-name">
+            {% if topic.exam_probability >= 0.85 %}
+              <span class="exam-prob" style="background:#ef4444;" title="Yüksek sınav olasılığı"></span>
+            {% elif topic.exam_probability >= 0.65 %}
+              <span class="exam-prob" style="background:#f59e0b;"></span>
+            {% else %}
+              <span class="exam-prob" style="background:#d1d5db;"></span>
+            {% endif %}
+            {{ topic.name }}
+          </div>
+          <div class="topic-meta">
+            {% if topic.difficulty == 'easy' %}🟢 Kolay{% elif topic.difficulty == 'medium' %}🟡 Orta{% else %}🔴 Zor{% endif %}
+            · {{ topic.recommended_hours }}h önerilen · ~{{ topic.question_count }} soru
+          </div>
+        </div>
+        <div class="topic-controls">
+          <input type="hidden" name="topic_{{ topic.id }}" id="kl_{{ topic.id }}" value="0">
+          <div class="kl-group">
+            <button type="button" class="kl-btn active-0" onclick="setKL({{ topic.id }}, 0, this)" data-val="0">Bilmiyorum</button>
+            <button type="button" class="kl-btn" onclick="setKL({{ topic.id }}, 1, this)" data-val="1">Zayıf</button>
+            <button type="button" class="kl-btn" onclick="setKL({{ topic.id }}, 2, this)" data-val="2">Orta</button>
+            <button type="button" class="kl-btn" onclick="setKL({{ topic.id }}, 3, this)" data-val="3">İyi</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary" style="width:100%; padding:14px; font-size:15px;">
+    Kaydı Tamamla ve Çalışma Planı Oluştur
+  </button>
+</form>
+
+<script>
+function toggleWork(sel) {
+  document.getElementById('work_hours_group').style.display = sel.value === 'yes' ? 'block' : 'none';
+}
+function calcTotal() {
+  const fields = ['mon','tue','wed','thu','fri','sat','sun'];
+  let total = 0;
+  fields.forEach(f => { total += parseFloat(document.querySelector(`[name="${f}"]`).value) || 0; });
+  document.getElementById('total_hours').textContent = total;
+  let label = total >= 40 ? '🔴 Yoğun' : total >= 20 ? '🟡 Orta' : total >= 10 ? '🟠 Sınırlı' : '⚪ Minimal';
+  document.getElementById('profile_label').textContent = label;
+}
+function setKL(topicId, val, btn) {
+  document.getElementById('kl_' + topicId).value = val;
+  const group = btn.closest('.kl-group');
+  group.querySelectorAll('.kl-btn').forEach(b => {
+    b.className = 'kl-btn';
+    if (parseInt(b.dataset.val) === val) b.classList.add('active-' + val);
+  });
+}
+</script>
+{% endblock %}

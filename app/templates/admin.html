@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel — DUS Koçluk{% endblock %}
+{% block content %}
+
+<h1 style="font-size:22px; font-weight:700; margin-bottom:24px;">Admin Panel</h1>
+
+<div class="grid3" style="margin-bottom:24px;">
+  <div class="card stat-box">
+    <div class="value">{{ student_data | length }}</div>
+    <div class="label">Toplam Öğrenci</div>
+  </div>
+  <div class="card stat-box">
+    <div class="value">{{ student_data | selectattr('risk', 'equalto', 'high') | list | length }}</div>
+    <div class="label">Riskli Öğrenci</div>
+  </div>
+  <div class="card stat-box">
+    <div class="value">{{ courses | length }}</div>
+    <div class="label">Aktif Ders</div>
+  </div>
+</div>
+
+<!-- Student List -->
+<div class="card" style="padding:0; overflow:hidden;">
+  <div style="padding:20px 24px 16px; border-bottom:1px solid #f1f5f9;">
+    <h2 style="margin:0;">Öğrenci Takip Tablosu</h2>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Öğrenci</th>
+        <th>Profil</th>
+        <th>Uyum (7 gün)</th>
+        <th>Son Aktivite</th>
+        <th>Risk</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for sd in student_data %}
+    <tr>
+      <td>
+        <div style="font-weight:500;">{{ sd.student.name }}</div>
+        <div style="font-size:12px; color:#9ca3af;">{{ sd.student.email }}</div>
+      </td>
+      <td><span class="badge badge-blue">{{ sd.profile_label }}</span></td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="progress-bar" style="width:80px;">
+            <div class="fill" style="width:{{ sd.avg_compliance }}%; background:{% if sd.avg_compliance >= 75 %}#10b981{% elif sd.avg_compliance >= 50 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+          </div>
+          <span style="font-size:13px; font-weight:600;">{{ sd.avg_compliance }}%</span>
+        </div>
+      </td>
+      <td style="font-size:13px; color:#6b7280;">{{ sd.last_active or '—' }}</td>
+      <td>
+        {% if sd.risk == 'high' %}<span class="badge badge-red">Yüksek Risk</span>
+        {% elif sd.risk == 'medium' %}<span class="badge badge-yellow">Orta Risk</span>
+        {% else %}<span class="badge badge-green">İyi</span>{% endif %}
+      </td>
+      <td><a href="/student/{{ sd.student.id }}" class="btn btn-primary btn-sm">Detay</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Course Overview -->
+<div class="card">
+  <h2>📚 Ders Yapısı</h2>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Ders</th><th>Soru Ağırlığı</th><th>Tahmini Süre</th></tr>
+    </thead>
+    <tbody>
+    {% for c in courses %}
+    <tr>
+      <td style="color:#9ca3af; font-size:13px;">{{ c.display_order }}</td>
+      <td style="font-weight:500;">{{ c.name }}</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="progress-bar" style="width:100px;">
+            <div class="fill" style="width:{{ c.weight_percent * 2 }}%;"></div>
+          </div>
+          <span style="font-size:13px;">%{{ c.weight_percent }}</span>
+        </div>
+      </td>
+      <td style="font-size:13px; color:#6b7280;">{{ c.estimated_study_hours }} saat</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

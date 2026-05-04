@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Çalışma Planı — {{ student.name }}{% endblock %}
+{% block head %}
+<style>
+.week-block { margin-bottom:28px; }
+.week-title { font-size:14px; font-weight:700; color:#1e40af; margin-bottom:12px;
+  padding:6px 12px; background:#eff6ff; border-radius:8px; display:inline-block; }
+.plan-table { width:100%; border-collapse:collapse; font-size:13px; }
+.plan-table th { background:#f8fafc; padding:8px 12px; text-align:left; font-weight:600;
+  color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb; }
+.plan-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.plan-table tr:last-child td { border-bottom:none; }
+.plan-table tr.today-row td { background:#eff6ff; }
+.plan-table tr.done-row td { background:#f0fdf4; opacity:.85; }
+.plan-table tr.skipped-row td { background:#f9fafb; opacity:.6; }
+.type-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
+.type-new { background:#dbeafe; color:#1e40af; }
+.type-review { background:#fef9c3; color:#92400e; }
+.diff-badge { font-size:11px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+  <div>
+    <h1 style="font-size:22px; font-weight:700;">📅 Çalışma Planı</h1>
+    <p style="color:#6b7280; font-size:14px; margin-top:4px;">
+      {{ student.name }} &nbsp;·&nbsp; <span class="badge badge-blue">{{ profile_label }}</span>
+    </p>
+  </div>
+  <div style="display:flex; gap:8px;">
+    <a href="/student/{{ student.id }}" class="btn btn-sm" style="background:#f1f5f9; color:#374151;">← Dashboard</a>
+    <form method="post" action="/student/{{ student.id }}/plan/regenerate" style="margin:0;">
+      <button type="submit" class="btn btn-primary btn-sm">🔄 Planı Yenile</button>
+    </form>
+  </div>
+</div>
+
+{% if not by_week %}
+<div class="card" style="text-align:center; padding:48px; color:#9ca3af;">
+  Plan bulunamadı. Haftalık müsaitlik bilgilerini kontrol edin.
+</div>
+{% endif %}
+
+{% for week_num in by_week | sort %}
+{% set week_days = by_week[week_num] %}
+<div class="card week-block">
+  {% if week_num == 0 %}
+  <span class="week-title">Bu Hafta</span>
+  {% elif week_num == 1 %}
+  <span class="week-title">Gelecek Hafta</span>
+  {% else %}
+  <span class="week-title">{{ week_num + 1 }}. Hafta</span>
+  {% endif %}
+
+  <table class="plan-table">
+    <thead>
+      <tr>
+        <th>Gün</th>
+        <th>Ders</th>
+        <th>Konu</th>
+        <th>Süre</th>
+        <th>Tür</th>
+        <th>Zorluk</th>
+        <th>Durum</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for day in week_days | sort %}
+    {% set sessions = week_days[day] %}
+    {% for s in sessions %}
+    <tr class="{% if day == today %}today-row{% elif s.is_completed %}done-row{% elif s.is_skipped %}skipped-row{% endif %}">
+      {% if loop.index == 1 %}
+      <td rowspan="{{ sessions|length }}" style="font-weight:600; color:#374151; white-space:nowrap;">
+        {{ days_tr[day.weekday()] }}<br>
+        <span style="font-size:11px; font-weight:400; color:#9ca3af;">{{ day.strftime('%d/%m') }}</span>
+        {% if day == today %}<br><span class="badge badge-blue" style="font-size:10px;">Bugün</span>{% endif %}
+      </td>
+      {% endif %}
+      <td style="color:#6b7280; font-size:12px;">{{ s.topic.course.name }}</td>
+      <td style="font-weight:500;">{{ s.topic.name }}</td>
+      <td style="white-space:nowrap;">{{ s.planned_hours }}h</td>
+      <td><span class="type-badge {{ 'type-new' if s.session_type == 'new' else 'type-review' }}">
+        {{ 'Yeni' if s.session_type == 'new' else 'Tekrar' }}
+      </span></td>
+      <td class="diff-badge">
+        {% if s.topic.difficulty == 'easy' %}🟢{% elif s.topic.difficulty == 'medium' %}🟡{% else %}🔴{% endif %}
+      </td>
+      <td>
+        {% if s.is_completed %}
+          <span class="badge badge-green">Tamamlandı</span>
+        {% elif s.is_skipped %}
+          <span class="badge badge-red">Atlandı</span>
+        {% elif day < today %}
+          <span class="badge badge-red">Kaçırıldı</span>
+        {% elif day == today %}
+          <span class="badge badge-blue">Bugün</span>
+        {% else %}
+          <span style="color:#9ca3af; font-size:12px;">Bekliyor</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Week summary -->
+  {% set all_sessions = [] %}
+  {% for d, ss in week_days.items() %}{% for s in ss %}{% set _ = all_sessions.append(s) %}{% endfor %}{% endfor %}
+  <div style="margin-top:10px; font-size:12px; color:#6b7280; display:flex; gap:16px; flex-wrap:wrap;">
+    <span>Toplam: <strong>{{ all_sessions | sum(attribute='planned_hours') }}h</strong></span>
+    <span>Tamamlanan: <strong>{{ all_sessions | selectattr('is_completed') | list | length }} oturum</strong></span>
+    <span>Yeni konu: <strong>{{ all_sessions | selectattr('session_type','eq','new') | list | length }}</strong></span>
+    <span>Tekrar: <strong>{{ all_sessions | selectattr('session_type','eq','review') | list | length }}</strong></span>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

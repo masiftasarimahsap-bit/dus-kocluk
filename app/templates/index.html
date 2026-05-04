@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Öğrenci Listesi — DUS Koçluk{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+  <h1 style="font-size:22px; font-weight:700;">Öğrenciler</h1>
+  <a href="/student/new" class="btn btn-primary">+ Yeni Öğrenci</a>
+</div>
+
+{% if students %}
+<div class="card" style="padding:0; overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Ad Soyad</th>
+        <th>Profil</th>
+        <th>Hedef</th>
+        <th>Sınav Tarihi</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for s in students %}
+      <tr>
+        <td style="font-weight:500;">{{ s.name }}</td>
+        <td>
+          {% if s.profile_type == 'intensive' %}<span class="badge badge-green">Yoğun</span>
+          {% elif s.profile_type == 'moderate' %}<span class="badge badge-blue">Orta</span>
+          {% elif s.profile_type == 'limited' %}<span class="badge badge-yellow">Sınırlı</span>
+          {% else %}<span class="badge badge-red">Minimal</span>{% endif %}
+        </td>
+        <td style="color:#6b7280; font-size:13px;">
+          {% if s.target_goal == 'top100' %}İlk 100
+          {% elif s.target_goal == 'top500' %}İlk 500
+          {% elif s.target_goal == 'pass' %}Kazanmak
+          {% else %}{{ s.target_goal }}{% endif %}
+        </td>
+        <td style="color:#6b7280; font-size:13px;">{{ s.exam_target_date or '—' }}</td>
+        <td><a href="/student/{{ s.id }}" class="btn btn-primary btn-sm">Dashboard</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:60px;">
+  <p style="font-size:40px; margin-bottom:12px;">🎓</p>
+  <p style="color:#6b7280; margin-bottom:20px;">Henüz kayıtlı öğrenci yok.</p>
+  <a href="/student/new" class="btn btn-primary">İlk Öğrenciyi Ekle</a>
+</div>
+{% endif %}
+{% endblock %}

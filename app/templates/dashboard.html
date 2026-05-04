@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}{{ student.name }} — Dashboard{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+.session-card {
+  border-left:3px solid #1e40af; padding:10px 14px; margin-bottom:8px;
+  background:#f8fafc; border-radius:0 8px 8px 0; display:flex;
+  align-items:flex-start; gap:10px;
+}
+.session-card.done { border-left-color:#10b981; background:#f0fdf4; opacity:.8; }
+.session-card.skipped { border-left-color:#d1d5db; background:#f9fafb; opacity:.6; text-decoration:line-through; }
+.session-card.review-type { border-left-color:#f59e0b; }
+.week-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+@media(max-width:900px){ .week-grid { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:500px){ .week-grid { grid-template-columns:1fr 1fr; } }
+.day-col { background:#f8fafc; border-radius:10px; padding:10px; min-height:80px; }
+.day-col.today-col { background:#eff6ff; border:2px solid #1e40af; }
+.day-col.rest-day { background:#f1f5f9; }
+.day-header { font-size:12px; font-weight:700; color:#6b7280; margin-bottom:6px; text-align:center; }
+.day-header.today-h { color:#1e40af; }
+.week-session { font-size:11px; background:white; border-radius:6px; padding:4px 7px;
+  margin-bottom:4px; border-left:3px solid #1e40af; cursor:pointer; line-height:1.3; }
+.week-session.done { border-left-color:#10b981; background:#f0fdf4; }
+.week-session.skipped { border-left-color:#d1d5db; opacity:.5; }
+.week-session.review-type { border-left-color:#f59e0b; }
+.form-actions { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Header -->
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+  <div>
+    <h1 style="font-size:22px; font-weight:700;">{{ student.name }}</h1>
+    <p style="color:#6b7280; font-size:14px; margin-top:4px;">
+      <span class="badge badge-blue">{{ profile_label }}</span>
+      {% if student.email %}&nbsp; {{ student.email }}{% endif %}
+      {% if student.phone %}&nbsp; {{ student.phone }}{% endif %}
+    </p>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    {% if days_left is not none %}
+    <div style="text-align:right;">
+      <div style="font-size:36px; font-weight:800; color:#dc2626;">{{ days_left }}</div>
+      <div style="font-size:13px; color:#6b7280;">gün kaldı</div>
+    </div>
+    {% endif %}
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <a href="/student/{{ student.id }}/plan" class="btn btn-primary btn-sm">📅 Tüm Plan</a>
+      <a href="/student/{{ student.id }}/notes" class="btn btn-sm" style="background:#f0fdf4; color:#166534;">📒 Notlarım</a>
+      <form method="post" action="/student/{{ student.id }}/plan/regenerate" style="margin:0;">
+        <button type="submit" class="btn btn-sm" style="background:#f1f5f9; color:#374151; width:100%;">🔄 Planı Yenile</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid3">
+  <div class="card stat-box">
+    <div class="value">{{ weekly_hours }}</div>
+    <div class="label">Haftalık Planlanan Saat</div>
+  </div>
+  <div class="card stat-box">
+    <div class="value">{{ avg_compliance }}%</div>
+    <div class="label">Ortalama Uyum (14 gün)</div>
+  </div>
+  <div class="card stat-box">
+    <div class="value">{{ student.last_mock_score or '—' }}</div>
+    <div class="label">Son Deneme Puanı</div>
+  </div>
+</div>
+
+<!-- Weekly Plan -->
+<div class="card">
+  <h2>📅 Bu Haftanın Planı</h2>
+  <div class="week-grid">
+    {% for d in week_days %}
+    {% set day_sessions = week_by_day.get(d, []) %}
+    {% set is_today = (d == today) %}
+    <div class="day-col {{ 'today-col' if is_today else ('rest-day' if not day_sessions else '') }}">
+      <div class="day-header {{ 'today-h' if is_today }}">
+        {{ days_short[d.weekday()] }}<br>
+        <span style="font-size:11px; font-weight:400;">{{ d.strftime('%d/%m') }}</span>
+        {% if is_today %}<br><span style="font-size:10px; color:#1e40af;">Bugün</span>{% endif %}
+      </div>
+      {% if day_sessions %}
+        {% set total_h = day_sessions | sum(attribute='planned_hours') %}
+        <div style="font-size:10px; color:#9ca3af; text-align:center; margin-bottom:5px;">{{ total_h }}h</div>
+        {% for s in day_sessions %}
+        <div class="week-session {{ 'done' if s.is_completed else ('skipped' if s.is_skipped else '') }} {{ 'review-type' if s.session_type == 'review' }}"
+             title="{{ s.topic.name }} — {{ s.planned_hours }}h">
+          {{ s.topic.name[:22] }}{% if s.topic.name|length > 22 %}…{% endif %}
+          <span style="color:#9ca3af; display:block; font-size:10px;">{{ s.planned_hours }}h
+            {% if s.session_type == 'review' %}· tekrar{% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center; color:#d1d5db; font-size:20px; margin-top:10px;">—</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <p style="font-size:12px; color:#9ca3af; margin-top:10px;">
+    <span style="border-left:3px solid #1e40af; padding-left:6px; margin-right:12px;">Yeni konu</span>
+    <span style="border-left:3px solid #f59e0b; padding-left:6px; margin-right:12px;">Tekrar</span>
+    <span style="border-left:3px solid #10b981; padding-left:6px; margin-right:12px;">Tamamlandı</span>
+  </p>
+</div>
+
+<div class="grid2">
+
+  <!-- Today's Sessions -->
+  <div class="card">
+    <h2>⏰ Bugünkü Oturumlar</h2>
+    {% if today_sessions %}
+      {% set total_today = today_sessions | sum(attribute='planned_hours') %}
+      <p style="font-size:13px; color:#6b7280; margin-bottom:14px;">Toplam hedef: <strong>{{ total_today }} saat</strong></p>
+      {% for s in today_sessions %}
+      <div class="session-card {{ 'done' if s.is_completed else ('skipped' if s.is_skipped else '') }} {{ 'review-type' if s.session_type == 'review' }}">
+        <div style="flex:1;">
+          <div style="font-size:13px; font-weight:600;">{{ s.topic.course.name }}</div>
+          <div style="font-size:13px; margin-top:2px;">📖 {{ s.topic.name }}</div>
+          <div style="font-size:12px; color:#9ca3af; margin-top:3px;">
+            ⏱ {{ s.planned_hours }}h
+            {% if s.session_type == 'review' %} · 🔄 Tekrar{% endif %}
+            {% if s.topic.difficulty == 'easy' %} · 🟢 Kolay{% elif s.topic.difficulty == 'medium' %} · 🟡 Orta{% else %} · 🔴 Zor{% endif %}
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <form method="post" action="/student/{{ student.id }}/session/{{ s.id }}/toggle" style="margin:0;">
+            <button type="submit" class="btn btn-sm"
+              style="background:{% if s.is_completed %}#dcfce7; color:#166534{% else %}#f1f5f9; color:#374151{% endif %}; white-space:nowrap;">
+              {% if s.is_completed %}✅ Tamam{% else %}Tamamla{% endif %}
+            </button>
+          </form>
+          <form method="post" action="/student/{{ student.id }}/session/{{ s.id }}/skip" style="margin:0;">
+            <button type="submit" class="btn btn-sm"
+              style="background:{% if s.is_skipped %}#fee2e2; color:#991b1b{% else %}#f9fafb; color:#9ca3af{% endif %};">
+              {% if s.is_skipped %}↩ Geri Al{% else %}Atla{% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:#9ca3af; font-size:14px;">Bugün için plan yok. Mola günü! 🎉</p>
+    {% endif %}
+  </div>
+
+  <!-- Daily Report Form -->
+  <div class="card">
+    <h2>📝 Gün Sonu Raporu</h2>
+    <form method="post" action="/student/{{ student.id }}/report" id="reportForm">
+      <div class="form-group">
+        <label>Bugün kaç saat çalıştın?</label>
+        <input type="number" name="actual_hours" min="0" max="16" step="0.5" value="0" required>
+      </div>
+      <div class="form-group">
+        <label>Bugün nasıl hissettin?</label>
+        <select name="mood">
+          <option value="great">🌟 Harika</option>
+          <option value="good" selected>😊 İyi</option>
+          <option value="neutral">😐 Normal</option>
+          <option value="bad">😔 Kötü</option>
+          <option value="terrible">😞 Berbat</option>
+        </select>
+      </div>
+
+      {% if today_sessions %}
+      <div style="border-top:1px solid #e5e7eb; padding-top:14px; margin-top:4px;">
+        <p style="font-size:13px; font-weight:600; margin-bottom:12px; color:#374151;">Konu Dönütleri</p>
+        {% for s in today_sessions %}
+        <div style="background:#f8fafc; border-radius:10px; padding:12px; margin-bottom:10px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin:0; font-weight:500; font-size:13px;">
+              <input type="checkbox" name="topic_done_{{ s.topic_id }}" value="1"
+                     {{ 'checked' if s.is_completed }}
+                     style="width:16px; height:16px; accent-color:#10b981;">
+              {{ s.topic.name }}
+            </label>
+            <span style="margin-left:auto; font-size:11px; color:#9ca3af;">
+              {{ s.topic.course.name }} · {{ s.planned_hours }}h
+            </span>
+          </div>
+          <textarea name="topic_note_{{ s.topic_id }}" rows="2"
+            placeholder="Bu konu hakkında not (opsiyonel)..."
+            style="font-size:12px; resize:vertical;"></textarea>
+          <!-- Görsel yükleme -->
+          <div style="margin-top:8px;">
+            <label style="font-size:12px; color:#6b7280; margin-bottom:4px;">Ekran görüntüsü ekle (görsel metne dönüştürülür)</label>
+            <input type="file" accept="image/*" style="font-size:12px;"
+                   onchange="uploadScreenshot(this, {{ s.topic_id }}, {{ student.id }})">
+            <div id="extract_{{ s.topic_id }}" style="display:none; margin-top:8px;
+              background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px; font-size:12px; color:#374151;">
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Genel not (opsiyonel)</label>
+        <textarea name="general_notes" rows="2" placeholder="Bugün hakkında genel bir not..."></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Raporu Kaydet</button>
+    </form>
+  </div>
+
+</div>
+
+<!-- Progress Chart -->
+<div class="card">
+  <h2>📈 Çalışma Grafiği (Son 14 Gün)</h2>
+  <canvas id="progressChart" height="80"></canvas>
+</div>
+
+<!-- Availability -->
+<div class="card">
+  <h2>⏰ Haftalık Müsaitlik</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    {% for i in range(7) %}
+    {% set h = availability.get(i, 0) %}
+    <div style="flex:1; min-width:80px; text-align:center; padding:12px 8px; background:{% if h == 0 %}#f1f5f9{% elif h < 2 %}#dbeafe{% elif h < 4 %}#bfdbfe{% else %}#93c5fd{% endif %}; border-radius:10px;">
+      <div style="font-size:12px; color:#6b7280; font-weight:600;">{{ days_tr[i] }}</div>
+      <div style="font-size:22px; font-weight:700; color:#1e40af; margin-top:4px;">{{ h | int if h == h | int else h }}</div>
+      <div style="font-size:11px; color:#9ca3af;">saat</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Course Progress -->
+<div class="card">
+  <h2>📚 Ders İlerlemesi</h2>
+  {% for cs in course_stats %}
+  <div style="margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+      <span style="font-size:14px; font-weight:500;">{{ cs.course.name }}</span>
+      <span style="font-size:13px; color:#6b7280;">{{ cs.done }}/{{ cs.total }} konu · <strong>{{ cs.pct }}%</strong></span>
+    </div>
+    <div class="progress-bar">
+      <div class="fill" style="width:{{ cs.pct }}%; background:{% if cs.pct < 30 %}#ef4444{% elif cs.pct < 70 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Reports -->
+{% if reports %}
+<div class="card">
+  <h2>📊 Son Raporlar</h2>
+  <table>
+    <thead>
+      <tr><th>Tarih</th><th>Çalışma</th><th>Uyum</th><th>Ruh Hali</th><th>Not</th></tr>
+    </thead>
+    <tbody>
+    {% for r in reports %}
+    <tr>
+      <td style="font-size:13px;">{{ r.date }}</td>
+      <td><strong>{{ r.total_actual_hours }}h</strong></td>
+      <td>
+        <span class="badge {% if r.compliance_rate >= 80 %}badge-green{% elif r.compliance_rate >= 50 %}badge-yellow{% else %}badge-red{% endif %}">
+          {{ r.compliance_rate }}%
+        </span>
+      </td>
+      <td>{{ mood_emoji.get(r.mood, '') }} {{ mood_labels.get(r.mood, r.mood or '—') }}</td>
+      <td style="font-size:12px; color:#9ca3af;">{{ r.notes or '' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<script>
+async function uploadScreenshot(input, topicId, studentId) {
+  if (!input.files[0]) return;
+  const box = document.getElementById('extract_' + topicId);
+  box.style.display = 'block';
+  box.innerHTML = '⏳ Görsel işleniyor, metin çıkarılıyor...';
+
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  try {
+    const res = await fetch(`/api/student/${studentId}/topic/${topicId}/upload`, {
+      method: 'POST', body: fd
+    });
+    const data = await res.json();
+    if (data.extracted_text) {
+      box.innerHTML = '<strong>📄 Çıkarılan metin:</strong><br><pre style="white-space:pre-wrap; margin-top:6px; font-size:11px;">'
+        + data.extracted_text.replace(/</g,'&lt;') + '</pre>';
+      // Not alanına da ekle
+      const noteField = document.querySelector(`[name="topic_note_${topicId}"]`);
+      if (noteField && !noteField.value) noteField.value = data.extracted_text;
+    } else {
+      box.innerHTML = '⚠️ Metin çıkarılamadı.';
+    }
+  } catch(e) {
+    box.innerHTML = '⚠️ Hata: ' + e.message;
+  }
+}
+
+const reportDates = {{ reports | map(attribute='date') | map('string') | list | tojson }};
+const hours = {{ reports | map(attribute='total_actual_hours') | list | tojson }};
+const compliance = {{ reports | map(attribute='compliance_rate') | list | tojson }};
+
+new Chart(document.getElementById('progressChart'), {
+  data: {
+    labels: reportDates.slice().reverse(),
+    datasets: [
+      { type: 'bar', label: 'Çalışma Saati', data: hours.slice().reverse(), backgroundColor: '#bfdbfe', yAxisID: 'y' },
+      { type: 'line', label: 'Uyum %', data: compliance.slice().reverse(), borderColor: '#1e40af', tension: .3, yAxisID: 'y1', pointRadius: 3 }
+    ]
+  },
+  options: {
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      y: { beginAtZero: true, title: { display: true, text: 'Saat' } },
+      y1: { beginAtZero: true, max: 100, position: 'right', title: { display: true, text: 'Uyum %' }, grid: { drawOnChartArea: false } }
+    }
+  }
+});
+</script>
+{% endblock %}

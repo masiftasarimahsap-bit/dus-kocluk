@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Notlarım — {{ student.name }}{% endblock %}
+{% block head %}
+<style>
+.note-card { border-radius:12px; border:1px solid #e5e7eb; padding:16px; margin-bottom:16px; }
+.note-card:hover { border-color:#1e40af; }
+.note-img { max-width:100%; border-radius:8px; border:1px solid #e5e7eb; margin-top:10px; cursor:pointer; }
+.note-img:hover { opacity:.9; }
+.extracted { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;
+  padding:12px; font-size:13px; line-height:1.6; margin-top:10px; white-space:pre-wrap; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+  <div>
+    <h1 style="font-size:22px; font-weight:700;">📒 Notlarım</h1>
+    <p style="color:#6b7280; font-size:14px; margin-top:4px;">{{ student.name }}</p>
+  </div>
+  <a href="/student/{{ student.id }}" class="btn btn-sm" style="background:#f1f5f9; color:#374151;">← Dashboard</a>
+</div>
+
+{% if not notes %}
+<div class="card" style="text-align:center; padding:48px; color:#9ca3af;">
+  Henüz not yok. Gün sonu raporlarında konu notları ekleyebilirsin.
+</div>
+{% endif %}
+
+{% set current_date = namespace(val=none) %}
+{% for note in notes %}
+  {% if note.date != current_date.val %}
+    {% set current_date.val = note.date %}
+    <div style="font-size:13px; font-weight:700; color:#6b7280; margin:20px 0 8px;
+      padding-bottom:4px; border-bottom:1px solid #e5e7eb;">
+      {{ note.date.strftime('%d %B %Y') }}
+    </div>
+  {% endif %}
+
+  <div class="note-card">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:8px;">
+      <div>
+        <span style="font-size:13px; color:#6b7280;">{{ note.topic.course.name }}</span>
+        <div style="font-size:15px; font-weight:600; margin-top:2px;">{{ note.topic.name }}</div>
+      </div>
+      {% if note.is_completed %}
+        <span class="badge badge-green">✅ Tamamlandı</span>
+      {% else %}
+        <span class="badge badge-yellow">🔄 Kısmi</span>
+      {% endif %}
+    </div>
+
+    {% if note.notes_text %}
+    <div style="font-size:13px; color:#374151; line-height:1.6; background:#f8fafc;
+      border-radius:8px; padding:10px; margin-top:8px; white-space:pre-wrap;">{{ note.notes_text }}</div>
+    {% endif %}
+
+    {% if note.image_path %}
+    <div style="margin-top:10px;">
+      <p style="font-size:12px; color:#9ca3af; margin-bottom:6px;">📷 Yüklenen görsel:</p>
+      <img src="/{{ note.image_path }}" class="note-img" style="max-height:300px;"
+           onclick="this.style.maxHeight = this.style.maxHeight === 'none' ? '300px' : 'none'">
+    </div>
+    {% endif %}
+
+    {% if note.extracted_text %}
+    <div style="margin-top:10px;">
+      <p style="font-size:12px; font-weight:600; color:#92400e; margin-bottom:4px;">📄 Görselden çıkarılan metin:</p>
+      <div class="extracted">{{ note.extracted_text }}</div>
+    </div>
+    {% endif %}
+  </div>
+{% endfor %}
+
+{% endblock %}
