@@ -15,12 +15,14 @@ from database import (
     TopicProgress, DailyReport, PlannedSession, SessionNote
 )
 
-app = FastAPI(title="DUS Koçluk Sistemi")
-templates = Jinja2Templates(directory="templates")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-UPLOAD_DIR = "static/uploads"
+app = FastAPI(title="DUS Koçluk Sistemi")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 DAYS_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 DAYS_SHORT = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
@@ -355,6 +357,7 @@ async def upload_screenshot(
     ext = os.path.splitext(file.filename or "img.png")[1].lower() or ".png"
     filename = f"{student_id}_{topic_id}_{uuid.uuid4().hex[:8]}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
+    rel_path = os.path.join("static", "uploads", filename)
 
     with open(filepath, "wb") as f:
         f.write(content)
@@ -369,14 +372,14 @@ async def upload_screenshot(
         SessionNote.date == date.today()
     ).first()
     if note:
-        note.image_path = filepath
+        note.image_path = rel_path
         note.extracted_text = extracted
     else:
         db.add(SessionNote(
             student_id=student_id,
             topic_id=topic_id,
             date=date.today(),
-            image_path=filepath,
+            image_path=rel_path,
             extracted_text=extracted,
         ))
     db.commit()

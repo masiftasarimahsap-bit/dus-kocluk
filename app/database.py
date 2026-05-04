@@ -4,7 +4,19 @@ from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime, date
 import enum
 
-engine = create_engine("sqlite:///./dus_kocluk.db", connect_args={"check_same_thread": False})
+import os as _os
+
+DATABASE_URL = _os.getenv("DATABASE_URL", "sqlite:///./dus_kocluk.db")
+
+# Supabase/Heroku postgres:// → postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
